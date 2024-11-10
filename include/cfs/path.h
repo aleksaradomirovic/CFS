@@ -17,11 +17,55 @@
  */
 #pragma once
 
+#define WIN_PATH_SEPARATOR "\\"
+#define POSIX_PATH_SEPARATOR "/"
+
 #if defined(_WIN32)
-#define PATH_SEPARATOR "\\"
+#define PATH_SEPARATOR WIN_PATH_SEPARATOR
 #else
-#define PATH_SEPARATOR "/"
+#define PATH_SEPARATOR POSIX_PATH_SEPARATOR
 #endif
 
 #define PATH_SELF "."
 #define PATH_PARENT ".."
+
+int posix_to_win_path(char * path);
+int win_to_posix_path(char * path);
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
+static int host_to_win_path(char * path) {
+#if defined(_WIN32)
+    return 0;
+#else
+    return posix_to_win_path(path);
+#endif
+}
+
+static int win_to_host_path(char * path) {
+#if defined(_WIN32)
+    return 0;
+#else
+    return win_to_posix_path(path);
+#endif
+}
+
+static int host_to_posix_path(char * path) {
+#if defined(_WIN32)
+    return win_to_posix_path(path);
+#else
+    return 0;
+#endif
+}
+
+static int posix_to_host_path(char * path) {
+#if defined(_WIN32)
+    return posix_to_win_path(path);
+#else
+    return 0;
+#endif
+}
+
+#pragma GCC diagnostic pop

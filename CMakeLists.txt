@@ -28,6 +28,7 @@ set(
     CFS_SRC
     src/lsdir.c
     src/mkdir.c
+    src/pathconv.c
     src/stat.c
 )
 

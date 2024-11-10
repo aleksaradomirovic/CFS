@@ -20,11 +20,14 @@ project(cfs LANGUAGES C)
 add_compile_options(
     -std=gnu17
     -O2
+    -fanalyzer
     -Wall -Wextra
 )
 
 set(
     CFS_SRC
+    src/lsdir.c
+    src/mkdir.c
     src/stat.c
 )
 

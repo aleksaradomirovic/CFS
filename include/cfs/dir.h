@@ -26,7 +26,7 @@ int create_directory_with_perms(const char * path, file_perms_t perms);
 
 struct directory_entry {
     char * path;
-    struct directory_entry * next;
+    struct directory_entry * next, * prev;
 };
 
 void free_directory_list(struct directory_entry * list);

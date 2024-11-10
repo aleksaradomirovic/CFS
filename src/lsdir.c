@@ -68,27 +68,31 @@ int list_directory(const char * path, struct directory_entry ** listptr) {
             }
         } else {
             if(strcmp(ent->d_name, PATH_SELF) == 0 || strcmp(ent->d_name, PATH_PARENT) == 0) continue;
-            {
-                struct directory_entry * next = malloc(sizeof(struct directory_entry));
-                if(!next) {
-                    free_directory_list_on_fail(list, dir, NULL);
-                    return -1;
-                }
-                next->path = malloc(strlen(path) + strlen(PATH_SEPARATOR) + strlen(ent->d_name) + 1);
-                if(!next->path) {
-                    free_directory_list_on_fail(list, dir, next);
-                    return -1;
-                }
-                next->next = NULL;
 
-                if(curr != NULL) {
-                    curr->next = next;
-                } else {
-                    list = next;
-                }
-
-                curr = next;
+            struct directory_entry * next = malloc(sizeof(struct directory_entry));
+            if(!next) {
+                free_directory_list_on_fail(list, dir, NULL);
+                return -1;
             }
+            next->path = malloc(strlen(path) + strlen(PATH_SEPARATOR) + strlen(ent->d_name) + 1);
+            if(!next->path) {
+                free_directory_list_on_fail(list, dir, next);
+                return -1;
+            }
+            next->next = NULL;
+            next->prev = curr;
+
+            if(curr != NULL) {
+                curr->next = next;
+            } else {
+                list = next;
+            }
+
+            strcpy(next->path, path);
+            strcat(next->path, PATH_SEPARATOR);
+            strcat(next->path, ent->d_name);
+
+            curr = next;
         }
     }
     if(closedir(dir) != 0) {
@@ -115,7 +119,7 @@ int list_directory_recursive(const char * path, struct directory_entry ** listpt
     if(status != 0) return -1;
 
     if(list != NULL) {
-        for(struct directory_entry * ent = list, * end = directory_list_end(list); ent != NULL; ent = ent->next) {
+        for(struct directory_entry * ent = list; ent != NULL; ent = ent->next) {
             status = is_directory(ent->path);
             if(status == 1) {
                 struct directory_entry * sublist;
@@ -127,8 +131,11 @@ int list_directory_recursive(const char * path, struct directory_entry ** listpt
                     return -1;
                 }
 
-                end->next = sublist;
-                end = directory_list_end(end);
+                if(sublist != NULL) {
+                    sublist->prev = ent;
+                    directory_list_end(sublist)->next = ent->next;
+                    ent->next = sublist;
+                }
             } else if(status != 0) {
                 int err = errno;
                 free_directory_list(list);

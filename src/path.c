@@ -15,21 +15,18 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, see <https://www.gnu.org/licenses/>.
  */
-#pragma once
+#include "cfs/path.h"
 
-#include <stdint.h>
+#include <string.h>
 
-typedef uint_least16_t file_perms_t;
-
-int create_directory(const char * path);
-int create_directory_recursive(const char * path);
-int create_directory_with_perms(const char * path, file_perms_t perms);
-
-struct directory_entry {
-    char * path;
-    struct directory_entry * next, * prev;
-};
-
-void free_directory_list(struct directory_entry * list);
-int list_directory(const char * path, struct directory_entry ** listptr);
-int list_directory_recursive(const char * path, struct directory_entry ** listptr);
+int parent_path(char * path) {
+    for(char * sep = path;;) {
+        char * nsep = strstr(sep + strlen(PATH_SEPARATOR), PATH_SEPARATOR);
+        if(nsep == NULL) {
+            if(sep != path) *sep = '\0';
+            break;
+        }
+        sep = nsep;
+    }
+    return 0;
+}

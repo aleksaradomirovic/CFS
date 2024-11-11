@@ -16,7 +16,13 @@
  * License along with this library; if not, see <https://www.gnu.org/licenses/>.
  */
 #include "cfs/dir.h"
+#include "cfs/path.h"
+#include "cfs/stat.h"
 
+#include <errno.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 
 #if defined(_WIN32)
@@ -24,16 +30,68 @@
 #endif
 
 int create_directory_with_perms(const char * path, file_perms_t perms) {
+#if defined(_WIN32)
+    errno = ENOTSUP;
+    return -1;
+#else
+    int status = mkdir(path, perms & 0777);
+    if(status != 0) return -1;
+    return 0;
+#endif
+}
+
+int create_directory(const char * path) {
     int status;
 #if defined(_WIN32)
     status = _mkdir(path);
 #else
-    status = mkdir(path, perms & 0777);
+    status = create_directory_with_perms(path, 0777);
 #endif
     if(status != 0) return -1;
     return 0;
 }
 
-int create_directory(const char * path) {
-    return create_directory_with_perms(path, 0777);
+int create_directory_recursive(const char * pathstr) {
+    int status;
+
+    if(strlen(pathstr) + 1 > PATH_MAX) {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+
+    char * path = malloc(strlen(pathstr) + 1);
+    if(!path) return -1;
+    strcpy(path, pathstr);
+
+    char * sep = path;
+    while(1) {
+        sep = strstr(sep, PATH_SEPARATOR);
+        if(sep == NULL) break;
+
+        sep += strlen(PATH_SEPARATOR);
+        char c = *sep;
+        *sep = '\0';
+
+        status = is_directory(path);
+        if(status < 0) {
+            int err = errno;
+            free(path);
+            errno = err;
+            return -1;
+        }
+        if(status == 0) {
+            status = create_directory(path);
+            if(status != 0) {
+                int err = errno;
+                free(path);
+                errno = err;
+                return -1;
+            }
+        }
+
+        *sep = c;
+    }
+
+    free(path);
+    return 0;
 }

@@ -20,7 +20,7 @@ project(cfs LANGUAGES C)
 add_compile_options(
     -std=gnu17
     -O2
-    -fanalyzer
+    -g -fanalyzer
     -Wall -Wextra
 )
 

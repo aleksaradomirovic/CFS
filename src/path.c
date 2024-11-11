@@ -19,14 +19,31 @@
 
 #include <string.h>
 
-int parent_path(char * path) {
-    for(char * sep = path;;) {
-        char * nsep = strstr(sep + strlen(PATH_SEPARATOR), PATH_SEPARATOR);
+static char * __find_last_separator(const char * path) {
+    for(const char * sep = path;;) {
+        const char * nsep = strstr(sep, PATH_SEPARATOR);
         if(nsep == NULL) {
-            if(sep != path) *sep = '\0';
-            break;
+            if(sep == path) return NULL;
+            return (char *) sep;
         }
-        sep = nsep;
+        sep = nsep + strlen(PATH_SEPARATOR);
     }
+}
+
+int parent_path(char * path) {
+    char * sep = __find_last_separator(path);
+    if(sep != NULL) {
+        *sep = '\0';
+    }
+
+    return 0;
+}
+
+int base_path(char * path) {
+    char * sep = __find_last_separator(path);
+    if(sep != NULL) {
+        strcpy(path, sep);
+    }
+
     return 0;
 }

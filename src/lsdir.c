@@ -25,6 +25,7 @@
 #include <string.h>
 
 #if defined(_WIN32)
+#include <fileapi.h>
 #else
 #include <dirent.h>
 #endif
@@ -38,73 +39,126 @@ void free_directory_list(struct directory_entry * list) {
     }
 }
 
-#if defined(_WIN32)
-#error not supported
-#else
-
-
-static void free_directory_list_on_fail(struct directory_entry * list, DIR * dir, void * extra) {
-    int err = errno;
-    if(extra) free(extra);
-    if(list) free_directory_list(list);
-    if(dir) closedir(dir);
-    errno = err;
-}
-
-int list_directory(const char * path, struct directory_entry ** listptr) {
-    struct directory_entry * list = NULL;
-
-    DIR * dir = opendir(path);
-    if(!dir) return -1;
-    for(struct directory_entry * curr = NULL;;) {
-        errno = 0;
-        struct dirent * ent = readdir(dir);
-        if(!ent) {
-            if(errno == 0) {
-                break;
-            } else {
-                free_directory_list_on_fail(list, dir, NULL);
-                return -1;
-            }
+static int read_directory_entry(DIR * dir, const char * rootpath, struct directory_entry ** entptr) {
+    errno = 0;
+    struct dirent * osent = readdir(dir);
+    if(osent == NULL) {
+        if(errno == 0) {
+            *entptr = NULL;
+            return 0;
         } else {
-            if(strcmp(ent->d_name, PATH_SELF) == 0 || strcmp(ent->d_name, PATH_PARENT) == 0) continue;
-
-            struct directory_entry * next = malloc(sizeof(struct directory_entry));
-            if(!next) {
-                free_directory_list_on_fail(list, dir, NULL);
-                return -1;
-            }
-            next->path = malloc(strlen(path) + strlen(PATH_SEPARATOR) + strlen(ent->d_name) + 1);
-            if(!next->path) {
-                free_directory_list_on_fail(list, dir, next);
-                return -1;
-            }
-            next->next = NULL;
-            next->prev = curr;
-
-            if(curr != NULL) {
-                curr->next = next;
-            } else {
-                list = next;
-            }
-
-            strcpy(next->path, path);
-            strcat(next->path, PATH_SEPARATOR);
-            strcat(next->path, ent->d_name);
-
-            curr = next;
+            return -1;
         }
     }
-    if(closedir(dir) != 0) {
-        free_directory_list_on_fail(list, NULL, NULL);
+
+    size_t pathlen = strlen(rootpath);
+    if(
+        __builtin_add_overflow(pathlen, strlen(PATH_SEPARATOR), &pathlen) ||
+        __builtin_add_overflow(pathlen, strlen(osent->d_name), &pathlen) ||
+        __builtin_add_overflow(pathlen, 1, &pathlen)
+    ) {
+        errno = ENAMETOOLONG;
         return -1;
     }
-    *listptr = list;
+
+    struct directory_entry * ent = malloc(sizeof(struct directory_entry));
+    if(!ent) return -1;
+
+    ent->path = malloc(pathlen);
+    if(!ent->path) {
+        int err = errno;
+        free(ent);
+        errno = err;
+        return -1;
+    }
+
+    strcpy(ent->path, rootpath);
+    strcat(ent->path, PATH_SEPARATOR);
+    strcat(ent->path, osent->d_name);
+
+    ent->next = NULL;
+    ent->prev = NULL;
+
+    *entptr = ent;
     return 0;
 }
 
+static int check_keep_name(const struct directory_entry * ent) {
+    char * path = malloc(strlen(ent->path) + 1);
+    if(!path) return -1;
 
-#endif
+    strcpy(path, ent->path);
+
+    if(base_path(path) != 0) {
+        int err = errno;
+        free(path);
+        errno = err;
+        return -1;
+    }
+
+    if(
+        strcmp(path, PATH_SELF) == 0 ||
+        strcmp(path, PATH_PARENT) == 0
+    ) {
+        free(path);
+        return 0;
+    }
+
+    free(path);
+    return 1;
+}
+
+int list_directory(const char * path, struct directory_entry ** listptr) {
+    int status;
+
+    struct directory_entry * list = NULL;
+    
+    DIR * dir = opendir(path);
+    if(!dir) return -1;
+
+    for(struct directory_entry * curr = NULL;;) {
+        struct directory_entry * next;
+        status = read_directory_entry(dir, path, &next);
+        if(status != 0) {
+            int err = errno;
+            free_directory_list(list);
+            errno = err;
+            return -1;
+        }
+        if(next == NULL) break;
+
+        status = check_keep_name(next);
+        if(status < 0) {
+            int err = errno;
+            free_directory_list(list);
+            free_directory_list(next);
+            errno = err;
+            return -1;
+        } else if(status == 0) {
+            free_directory_list(next);
+            continue;
+        }
+
+        next->prev = curr;
+        if(curr != NULL) {
+            curr->next = next;
+        } else {
+            list = next;
+        }
+        curr = next;
+    }
+
+    status = closedir(dir);
+    if(status != 0) {
+        int err = errno;
+        free_directory_list(list);
+        errno = err;
+        return -1;
+    }
+
+    *listptr = list;
+    return 0;
+}
 
 static struct directory_entry * directory_list_end(struct directory_entry * list) {
     for(; list->next != NULL; list = list->next);

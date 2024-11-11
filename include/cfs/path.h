@@ -71,3 +71,4 @@ static int posix_to_host_path(char * path) {
 #pragma GCC diagnostic pop
 
 int parent_path(char * path);
+int base_path(char * path);

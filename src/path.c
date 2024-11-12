@@ -34,6 +34,8 @@ int parent_path(char * path) {
     char * sep = __find_last_separator(path);
     if(sep != NULL) {
         *sep = '\0';
+    } else {
+    	*path = '\0';
     }
 
     return 0;

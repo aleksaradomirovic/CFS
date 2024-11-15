@@ -26,6 +26,7 @@ add_compile_options(
 
 set(
     CFS_SRC
+    src/cwd.c
     src/lsdir.c
     src/mkdir.c
     src/path.c

@@ -15,24 +15,47 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, see <https://www.gnu.org/licenses/>.
  */
-#pragma once
+#include "cfs/dir.h"
 
-#include <stdint.h>
+#include <errno.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
-typedef uint_least16_t file_perms_t;
+#if defined(_WIN32)
+#define GETCWD _getcwd
+#define CHDIR _chdir
+#else
+#define GETCWD getcwd
+#define CHDIR chdir
+#endif
 
-int create_directory(const char * path);
-int create_directory_recursive(const char * path);
-int create_directory_with_perms(const char * path, file_perms_t perms);
+int get_current_directory(char ** dir) {
+    char * cwd = malloc(PATH_MAX);
+    if(!cwd) return -1;
 
-int get_current_directory(char ** dir);
-int set_current_directory(const char * dir);
+    if(!GETCWD(cwd, PATH_MAX)) {
+        int err = errno;
+        free(cwd);
+        errno = err;
+        return -1;
+    }
 
-struct directory_entry {
-    char * path;
-    struct directory_entry * next, * prev;
-};
+    {
+        char * trim = realloc(cwd, strnlen(cwd, PATH_MAX));
+        if(trim) {
+            cwd = trim;
+        }
+    }
 
-void free_directory_list(struct directory_entry * list);
-int list_directory(const char * path, struct directory_entry ** listptr);
-int list_directory_recursive(const char * path, struct directory_entry ** listptr);
+    *dir = cwd;
+    return 0;
+}
+
+int set_current_directory(const char * dir) {
+    int status;
+    status = CHDIR(dir);
+    if(status != 0) return -1;
+    return 0;
+}
